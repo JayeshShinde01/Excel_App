@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Excel Search App</title>
+
+<style>
+body {
+    font-family: Arial;
+    background: #f4f6f9;
+    padding: 20px;
+}
+
+.container {
+    max-width: 900px;
+    margin: auto;
+}
+
+.card {
+    background: white;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+button {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 10px;
+    width: 100%;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #0056b3;
+}
+
+input, select {
+    width: 100%;
+    padding: 10px;
+    margin: 8px 0;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th {
+    background: #007bff;
+    color: white;
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+}
+
+.error { color: red; }
+.success { color: green; }
+
+/* Popup */
+.popup {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: #28a745;
+    color: white;
+    padding: 15px;
+    border-radius: 8px;
+    display: none;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+    <h2>📊 Excel Upload & Search</h2>
+
+    <!-- Upload -->
+    <div class="card">
+        <h3>Upload Excel</h3>
+        <input type="file" id="excelFile">
+        <button onclick="uploadExcel()">Upload</button>
+    </div>
+
+    <!-- Search -->
+    <div class="card">
+        <h3>Search</h3>
+
+        <label>Column</label>
+        <select id="columnSelect">
+            <option value="">-- Upload Excel First --</option>
+        </select>
+
+        <label>Value</label>
+        <input type="text" id="columnValue" placeholder="Select column first">
+
+        <button onclick="searchData()">Search</button>
+
+        <p id="searchMsg"></p>
+    </div>
+
+    <!-- Result -->
+    <div class="card">
+        <h3>Result</h3>
+        <div id="result"></div>
+    </div>
+</div>
+
+<div class="popup" id="popup"></div>
+
+<script>
+const BASE_URL = "http://127.0.0.1:8000";
+let columns = [];
+
+function showPopup(msg) {
+    const popup = document.getElementById("popup");
+    popup.innerText = msg;
+    popup.style.display = "block";
+    setTimeout(() => popup.style.display = "none", 3000);
+}
+
+async function uploadExcel() {
+    const fileInput = document.getElementById("excelFile");
+
+    if (!fileInput.files.length) {
+        alert("Please select a file");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("file", fileInput.files[0]);
+
+    const res = await fetch(`${BASE_URL}/upload-excel/`, {
+        method: "POST",
+        body: formData
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+        alert(data.detail);
+        return;
+    }
+
+    columns = data.columns;
+    populateDropdown(columns);
+    showPopup(`✅ File uploaded (${data.rows} rows)`);
+}
+
+function populateDropdown(cols) {
+    const select = document.getElementById("columnSelect");
+    select.innerHTML = `<option value="">-- Select Column --</option>`;
+
+    cols.forEach(col => {
+        const opt = document.createElement("option");
+        opt.value = col;
+        opt.innerText = col;
+        select.appendChild(opt);
+    });
+}
+
+async function searchData() {
+    const column = document.getElementById("columnSelect").value;
+    const value = document.getElementById("columnValue").value;
+    const msg = document.getElementById("searchMsg");
+    const result = document.getElementById("result");
+
+    msg.innerHTML = "";
+    result.innerHTML = "";
+
+    if (!column || !value) {
+        msg.innerHTML = "<span class='error'>Select column & enter value</span>";
+        return;
+    }
+
+    const payload = {};
+    payload[column] = value;
+
+    const res = await fetch(`${BASE_URL}/search/`, {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify(payload)
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+        msg.innerHTML = `<span class='error'>${data.detail}</span>`;
+        return;
+    }
+
+    if (data.count === 0) {
+        msg.innerHTML = "<span class='error'>Data not found</span>";
+        return;
+    }
+
+    msg.innerHTML = `<span class='success'>${data.count} record(s) found</span>`;
+    renderTable(data.data);
+}
+
+function renderTable(data) {
+    const table = document.createElement("table");
+    const headers = Object.keys(data[0]);
+
+    const thead = document.createElement("thead");
+    const tr = document.createElement("tr");
+
+    headers.forEach(h => {
+        const th = document.createElement("th");
+        th.innerText = h;
+        tr.appendChild(th);
+    });
+
+    thead.appendChild(tr);
+    table.appendChild(thead);
+
+    const tbody = document.createElement("tbody");
+    data.forEach(row => {
+        const tr = document.createElement("tr");
+        headers.forEach(h => {
+            const td = document.createElement("td");
+            td.innerText = row[h];
+            tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+    });
+
+    table.appendChild(tbody);
+    document.getElementById("result").appendChild(table);
+}
+</script>
+
+
+<script>
+document.addEventListener("DOMContentLoaded", checkExcelStatus);
+
+async function checkExcelStatus() {
+    const res = await fetch(`${BASE_URL}/excel-status/`);
+    const data = await res.json();
+
+    if (data.uploaded) {
+        populateDropdown(data.columns);
+        showPopup(`📂 Excel already loaded (${data.rows} rows)`);
+    }
+}
+</script>
+
+
+</body>
+</html>

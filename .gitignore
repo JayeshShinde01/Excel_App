@@ -1,0 +1,24 @@
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Virtual environment
+venv/
+.env
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE / Editor
+.vscode/
+.idea/
+
+# Excel runtime data (optional)
+data/current.xlsx
+
+# Logs
+*.log
+
+# Node / frontend cache (if added later)
+node_modules/
